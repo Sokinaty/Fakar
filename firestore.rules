@@ -1,0 +1,617 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == 'amadkor8686@gmail.com' && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidAdminCredentialHash(hash) {
+      return hash is string && hash.size() == 64 && (
+        hash == '30abc011a5732e2ef1238986671a09d8f13421cdeef7d1f1b615a3f2860e98c4' ||
+        (
+          exists(/databases/$(database)/documents/access_codes/$(hash)) &&
+          get(/databases/$(database)/documents/access_codes/$(hash)).data.role == 'admin' &&
+          get(/databases/$(database)/documents/access_codes/$(hash)).data.active == true
+        )
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidTimestamp(ts) {
+      return ts is timestamp && ts <= request.time;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.credentialHash is string && data.credentialHash.size() == 64 &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidAccessCode(data) {
+      return data.username is string && data.username.size() >= 2 && data.username.size() <= 50 &&
+             data.role in ['parent', 'admin'] &&
+             data.studentId is string && data.studentId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.linkedUid is string && data.linkedUid.size() <= 128 &&
+             data.active is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.email is string && data.email.size() <= 120 &&
+             (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+             data.role in ['parent', 'admin'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidStudent(data) {
+      return data.parentUid is string && data.parentUid.size() >= 1 && data.parentUid.size() <= 128 &&
+             data.parentName is string && data.parentName.size() >= 1 && data.parentName.size() <= 80 &&
+             data.parentPhone is string && data.parentPhone.size() <= 30 &&
+             data.childName is string && data.childName.size() >= 1 && data.childName.size() <= 80 &&
+             data.ageYears is int && data.ageYears >= 1 && data.ageYears <= 25 &&
+             data.primaryService is string && data.primaryService.size() >= 1 && data.primaryService.size() <= 60 &&
+             data.specialistName is string && data.specialistName.size() >= 1 && data.specialistName.size() <= 80 &&
+             data.caseStatus in ['active', 'assessment', 'completed', 'paused'] &&
+             data.progressPercent is int && data.progressPercent >= 0 && data.progressPercent <= 100 &&
+             data.totalSessions is int && data.totalSessions >= 0 && data.totalSessions <= 500 &&
+             data.attendedSessions is int && data.attendedSessions >= 0 && data.attendedSessions <= 500 &&
+             data.clinicalNotes is string && data.clinicalNotes.size() <= 1000 &&
+             data.currentGoals is string && data.currentGoals.size() <= 500 &&
+             data.clientUsername is string && data.clientUsername.size() <= 50 &&
+             data.clientPassword is string && data.clientPassword.size() <= 50 &&
+             data.credentialHash is string && data.credentialHash.size() <= 64 &&
+             data.pendingSyncRefs is list && data.pendingSyncRefs.size() <= 30 &&
+             (data.pendingSyncRefs.size() == 0 || data.pendingSyncRefs[0] is string) &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidAppointment(data) {
+      return data.parentUid is string && data.parentUid.size() >= 1 && data.parentUid.size() <= 128 &&
+             data.studentId is string && isValidId(data.studentId) &&
+             data.childName is string && data.childName.size() >= 1 && data.childName.size() <= 80 &&
+             data.serviceName is string && data.serviceName.size() >= 1 && data.serviceName.size() <= 60 &&
+             data.specialistName is string && data.specialistName.size() >= 1 && data.specialistName.size() <= 80 &&
+             data.dateLabel is string && data.dateLabel.size() >= 1 && data.dateLabel.size() <= 40 &&
+             data.timeSlot is string && data.timeSlot.size() >= 1 && data.timeSlot.size() <= 30 &&
+             data.scheduledEpochMs is int && data.scheduledEpochMs >= 0 &&
+             data.status in ['pending', 'confirmed', 'completed', 'absent', 'cancelled'] &&
+             data.paymentStatus in ['unpaid', 'paid'] &&
+             data.feeAmount is int && data.feeAmount >= 0 && data.feeAmount <= 10000 &&
+             data.notes is string && data.notes.size() <= 500 &&
+             data.reminderMinutesBefore is int && data.reminderMinutesBefore >= 0 && data.reminderMinutesBefore <= 1440 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidEvaluation(data) {
+      return data.studentId is string && isValidId(data.studentId) &&
+             data.parentUid is string && data.parentUid.size() >= 1 && data.parentUid.size() <= 128 &&
+             data.childName is string && data.childName.size() >= 1 && data.childName.size() <= 80 &&
+             data.monthLabel is string && data.monthLabel.size() >= 1 && data.monthLabel.size() <= 40 &&
+             data.specialistName is string && data.specialistName.size() >= 1 && data.specialistName.size() <= 80 &&
+             data.speechScore is int && data.speechScore >= 0 && data.speechScore <= 100 &&
+             data.attentionScore is int && data.attentionScore >= 0 && data.attentionScore <= 100 &&
+             data.behaviorScore is int && data.behaviorScore >= 0 && data.behaviorScore <= 100 &&
+             data.cognitiveScore is int && data.cognitiveScore >= 0 && data.cognitiveScore <= 100 &&
+             data.motorScore is int && data.motorScore >= 0 && data.motorScore <= 100 &&
+             data.overallScore is int && data.overallScore >= 0 && data.overallScore <= 100 &&
+             data.summary is string && data.summary.size() >= 1 && data.summary.size() <= 1000 &&
+             data.homeRecommendations is string && data.homeRecommendations.size() <= 1000 &&
+             data.parentAcknowledged is bool &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidPayment(data) {
+      return data.parentUid is string && data.parentUid.size() >= 1 && data.parentUid.size() <= 128 &&
+             data.appointmentId is string && data.appointmentId.size() <= 128 &&
+             data.childName is string && data.childName.size() >= 1 && data.childName.size() <= 80 &&
+             data.description is string && data.description.size() >= 1 && data.description.size() <= 150 &&
+             data.amountEgp is int && data.amountEgp >= 1 && data.amountEgp <= 50000 &&
+             data.method in ['card', 'vodafone_cash', 'instapay', 'center_cash'] &&
+             data.referenceCode is string && data.referenceCode.size() >= 1 && data.referenceCode.size() <= 40 &&
+             data.status in ['completed', 'refunded'] &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidChat(data) {
+      return data.parentUid is string && data.parentUid.size() >= 1 && data.parentUid.size() <= 128 &&
+             data.parentName is string && data.parentName.size() >= 1 && data.parentName.size() <= 80 &&
+             data.specialistId is string && data.specialistId.size() >= 1 && data.specialistId.size() <= 60 &&
+             data.specialistName is string && data.specialistName.size() >= 1 && data.specialistName.size() <= 80 &&
+             data.lastMessage is string && data.lastMessage.size() <= 500 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidChatMessage(data) {
+      return data.parentUid is string && data.parentUid.size() >= 1 && data.parentUid.size() <= 128 &&
+             data.senderUid is string && data.senderUid.size() >= 1 && data.senderUid.size() <= 128 &&
+             data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+             data.senderRole in ['parent', 'admin'] &&
+             data.text is string && data.text.size() >= 1 && data.text.size() <= 1000 &&
+             isValidTimestamp(data.createdAt);
+    }
+
+    function isValidNotification(data) {
+      return data.parentUid is string && data.parentUid.size() >= 1 && data.parentUid.size() <= 128 &&
+             data.studentId is string && data.studentId.size() <= 128 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.body is string && data.body.size() >= 1 && data.body.size() <= 400 &&
+             data.category in ['reminder', 'evaluation', 'payment', 'general'] &&
+             data.read is bool &&
+             data.scheduledForLabel is string && data.scheduledForLabel.size() <= 60 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCaseFile(data) {
+      return data.studentId is string && isValidId(data.studentId) &&
+             data.parentUid is string && data.parentUid.size() >= 1 && data.parentUid.size() <= 128 &&
+             data.childName is string && data.childName.size() >= 1 && data.childName.size() <= 80 &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.category in ['report', 'plan', 'assessment', 'worksheet', 'other'] &&
+             data.notes is string && data.notes.size() <= 500 &&
+             data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 120 &&
+             data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 100 &&
+             data.fileSizeBytes is int && data.fileSizeBytes >= 0 && data.fileSizeBytes <= 20000000 &&
+             data.contentBase64 is string && data.contentBase64.size() <= 900000 &&
+             data.externalUrl is string && data.externalUrl.size() <= 500 &&
+             (data.contentBase64.size() > 0 || data.externalUrl.size() > 0) &&
+             data.uploadedByName is string && data.uploadedByName.size() >= 1 && data.uploadedByName.size() <= 80 &&
+             isValidTimestamp(data.createdAt) &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    function isValidCenterConfig(data) {
+      return data.centerName is string && data.centerName.size() >= 1 && data.centerName.size() <= 120 &&
+             data.centerSlogan is string && data.centerSlogan.size() <= 120 &&
+             data.centerPhone is string && data.centerPhone.size() >= 1 && data.centerPhone.size() <= 30 &&
+             data.centerAddress is string && data.centerAddress.size() >= 1 && data.centerAddress.size() <= 200 &&
+             data.centerHours is string && data.centerHours.size() <= 150 &&
+             (data.centerLat is float || data.centerLat is int) &&
+             (data.centerLng is float || data.centerLng is int) &&
+             data.welcomeNote is string && data.welcomeNote.size() <= 400 &&
+             data.bookButtonLabel is string && data.bookButtonLabel.size() >= 1 && data.bookButtonLabel.size() <= 60 &&
+             data.posterBannerTitle is string && data.posterBannerTitle.size() <= 120 &&
+             data.showPosterBanner is bool &&
+             data.services is list && data.services.size() <= 30 &&
+             data.specialists is list && data.specialists.size() <= 30 &&
+             data.packages is list && data.packages.size() <= 20 &&
+             data.timeSlots is list && data.timeSlots.size() <= 30 &&
+             data.customButtons is list && data.customButtons.size() <= 25 &&
+             isValidTimestamp(data.updatedAt);
+    }
+
+    match /admins/{userId} {
+      allow get: if isSignedIn() && isOwner(userId);
+      allow list: if false;
+      allow create, update: if isSignedIn() &&
+                               isValidId(userId) &&
+                               isOwner(userId) &&
+                               incoming().keys().hasAll(['userId', 'credentialHash', 'createdAt']) &&
+                               incoming().keys().hasOnly(['userId', 'credentialHash', 'createdAt']) &&
+                               incoming().userId == request.auth.uid &&
+                               isValidAdminRecord(incoming()) &&
+                               isValidAdminCredentialHash(incoming().credentialHash);
+      allow delete: if isSignedIn() && isOwner(userId);
+    }
+
+    match /access_codes/{codeHash} {
+      allow get: if isSignedIn() && isValidId(codeHash);
+      allow list: if isAdmin();
+      allow create: if isSignedIn() &&
+                       isValidId(codeHash) &&
+                       incoming().keys().hasAll([
+                         'username', 'role', 'studentId', 'displayName',
+                         'linkedUid', 'active', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'username', 'role', 'studentId', 'displayName',
+                         'linkedUid', 'active', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidAccessCode(incoming()) &&
+                       (
+                         isAdmin() ||
+                         (
+                           incoming().role == 'parent' &&
+                           incoming().linkedUid == request.auth.uid &&
+                           incoming().active == true &&
+                           isValidId(incoming().studentId) &&
+                           exists(/databases/$(database)/documents/students/$(incoming().studentId))
+                         )
+                       );
+      allow update: if isSignedIn() &&
+                       isValidId(codeHash) &&
+                       isValidAccessCode(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().role == existing().role &&
+                       incoming().studentId == existing().studentId &&
+                       incoming().username == existing().username &&
+                       (
+                         isAdmin() ||
+                         (
+                           existing().active == true &&
+                           incoming().active == true &&
+                           incoming().linkedUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['linkedUid', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isAdmin() && isValidId(codeHash);
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isOwner(userId) &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'email', 'role', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'phone', 'role', 'createdAt', 'updatedAt']) &&
+                       isValidUserProfile(incoming()) &&
+                       (incoming().role == 'parent' || isAdmin());
+      allow update: if isSignedIn() &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         isAdmin() ||
+                         (
+                           isOwner(userId) &&
+                           incoming().role == existing().role &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'phone', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isAdmin();
+    }
+
+    match /students/{studentId} {
+      allow get: if isSignedIn() && isValidId(studentId) && (existing().parentUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().parentUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+                       isValidId(studentId) &&
+                       incoming().keys().hasAll([
+                         'parentUid', 'parentName', 'parentPhone', 'childName', 'ageYears',
+                         'primaryService', 'specialistName', 'caseStatus', 'progressPercent',
+                         'totalSessions', 'attendedSessions', 'clinicalNotes', 'currentGoals',
+                         'clientUsername', 'clientPassword', 'credentialHash', 'pendingSyncRefs',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'parentUid', 'parentName', 'parentPhone', 'childName', 'ageYears',
+                         'primaryService', 'specialistName', 'caseStatus', 'progressPercent',
+                         'totalSessions', 'attendedSessions', 'clinicalNotes', 'currentGoals',
+                         'clientUsername', 'clientPassword', 'credentialHash', 'pendingSyncRefs',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidStudent(incoming()) &&
+                       (incoming().parentUid == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() &&
+                       isValidId(studentId) &&
+                       isValidStudent(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         isAdmin() ||
+                         (
+                           existing().credentialHash is string &&
+                           existing().credentialHash.size() == 64 &&
+                           exists(/databases/$(database)/documents/access_codes/$(existing().credentialHash)) &&
+                           get(/databases/$(database)/documents/access_codes/$(existing().credentialHash)).data.active == true &&
+                           get(/databases/$(database)/documents/access_codes/$(existing().credentialHash)).data.role == 'parent' &&
+                           get(/databases/$(database)/documents/access_codes/$(existing().credentialHash)).data.studentId == studentId &&
+                           get(/databases/$(database)/documents/access_codes/$(existing().credentialHash)).data.linkedUid == request.auth.uid &&
+                           incoming().parentUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['parentUid', 'pendingSyncRefs', 'updatedAt'])
+                         ) ||
+                         (
+                           existing().parentUid == request.auth.uid &&
+                           incoming().parentUid == existing().parentUid &&
+                           incoming().clientUsername == existing().clientUsername &&
+                           incoming().clientPassword == existing().clientPassword &&
+                           incoming().credentialHash == existing().credentialHash &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'childName', 'ageYears', 'parentPhone', 'primaryService', 'updatedAt'
+                           ])
+                         )
+                       );
+      allow delete: if isAdmin() && isValidId(studentId);
+    }
+
+    match /appointments/{appointmentId} {
+      allow get: if isSignedIn() && isValidId(appointmentId) && (existing().parentUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().parentUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+                       isValidId(appointmentId) &&
+                       incoming().keys().hasAll([
+                         'parentUid', 'studentId', 'childName', 'serviceName', 'specialistName',
+                         'dateLabel', 'timeSlot', 'scheduledEpochMs', 'status', 'paymentStatus',
+                         'feeAmount', 'notes', 'reminderMinutesBefore', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'parentUid', 'studentId', 'childName', 'serviceName', 'specialistName',
+                         'dateLabel', 'timeSlot', 'scheduledEpochMs', 'status', 'paymentStatus',
+                         'feeAmount', 'notes', 'reminderMinutesBefore', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidAppointment(incoming()) &&
+                       (
+                         isAdmin() ||
+                         (
+                           incoming().parentUid == request.auth.uid &&
+                           incoming().status == 'pending' &&
+                           incoming().paymentStatus == 'unpaid'
+                         )
+                       ) &&
+                       exists(/databases/$(database)/documents/students/$(incoming().studentId));
+      allow update: if isSignedIn() &&
+                       isValidId(appointmentId) &&
+                       isValidAppointment(incoming()) &&
+                       incoming().studentId == existing().studentId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         isAdmin() ||
+                         (
+                           existing().parentUid == 'pending_link' &&
+                           get(/databases/$(database)/documents/students/$(existing().studentId)).data.parentUid == request.auth.uid &&
+                           incoming().parentUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['parentUid', 'updatedAt'])
+                         ) ||
+                         (
+                           existing().parentUid == request.auth.uid &&
+                           incoming().parentUid == existing().parentUid &&
+                           existing().status in ['pending', 'confirmed'] &&
+                           incoming().status in ['pending', 'cancelled'] &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'dateLabel', 'timeSlot', 'scheduledEpochMs', 'notes',
+                             'reminderMinutesBefore', 'status', 'updatedAt'
+                           ])
+                         ) ||
+                         (
+                           existing().parentUid == request.auth.uid &&
+                           incoming().parentUid == existing().parentUid &&
+                           existing().paymentStatus == 'unpaid' &&
+                           incoming().paymentStatus == 'paid' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['paymentStatus', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isAdmin() && isValidId(appointmentId);
+    }
+
+    match /evaluations/{evaluationId} {
+      allow get: if isSignedIn() && isValidId(evaluationId) && (existing().parentUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().parentUid == request.auth.uid || isAdmin());
+      allow create: if isAdmin() &&
+                       isValidId(evaluationId) &&
+                       incoming().keys().hasAll([
+                         'studentId', 'parentUid', 'childName', 'monthLabel', 'specialistName',
+                         'speechScore', 'attentionScore', 'behaviorScore', 'cognitiveScore',
+                         'motorScore', 'overallScore', 'summary', 'homeRecommendations',
+                         'parentAcknowledged', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'studentId', 'parentUid', 'childName', 'monthLabel', 'specialistName',
+                         'speechScore', 'attentionScore', 'behaviorScore', 'cognitiveScore',
+                         'motorScore', 'overallScore', 'summary', 'homeRecommendations',
+                         'parentAcknowledged', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidEvaluation(incoming()) &&
+                       exists(/databases/$(database)/documents/students/$(incoming().studentId));
+      allow update: if isSignedIn() &&
+                       isValidId(evaluationId) &&
+                       isValidEvaluation(incoming()) &&
+                       incoming().studentId == existing().studentId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         isAdmin() ||
+                         (
+                           existing().parentUid == 'pending_link' &&
+                           get(/databases/$(database)/documents/students/$(existing().studentId)).data.parentUid == request.auth.uid &&
+                           incoming().parentUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['parentUid', 'updatedAt'])
+                         ) ||
+                         (
+                           existing().parentUid == request.auth.uid &&
+                           incoming().parentUid == existing().parentUid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['parentAcknowledged', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isAdmin() && isValidId(evaluationId);
+    }
+
+    match /payments/{paymentId} {
+      allow get: if isSignedIn() && isValidId(paymentId) && (existing().parentUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().parentUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+                       isValidId(paymentId) &&
+                       incoming().keys().hasAll([
+                         'parentUid', 'appointmentId', 'childName', 'description',
+                         'amountEgp', 'method', 'referenceCode', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'parentUid', 'appointmentId', 'childName', 'description',
+                         'amountEgp', 'method', 'referenceCode', 'status', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidPayment(incoming()) &&
+                       incoming().status == 'completed' &&
+                       (incoming().parentUid == request.auth.uid || isAdmin());
+      allow update: if isAdmin() &&
+                       isValidId(paymentId) &&
+                       isValidPayment(incoming()) &&
+                       incoming().parentUid == existing().parentUid &&
+                       incoming().createdAt == existing().createdAt;
+      allow delete: if false;
+    }
+
+    match /chats/{chatId} {
+      allow get: if isSignedIn() && isValidId(chatId) && (existing().parentUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().parentUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+                       isValidId(chatId) &&
+                       incoming().keys().hasAll([
+                         'parentUid', 'parentName', 'specialistId', 'specialistName',
+                         'lastMessage', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'parentUid', 'parentName', 'specialistId', 'specialistName',
+                         'lastMessage', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidChat(incoming()) &&
+                       (incoming().parentUid == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() &&
+                       isValidId(chatId) &&
+                       isValidChat(incoming()) &&
+                       incoming().parentUid == existing().parentUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       (existing().parentUid == request.auth.uid || isAdmin()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'updatedAt']);
+      allow delete: if isAdmin() && isValidId(chatId);
+
+      match /messages/{messageId} {
+        allow get: if isSignedIn() && isValidId(chatId) && isValidId(messageId) && (existing().parentUid == request.auth.uid || isAdmin());
+        allow list: if isSignedIn() && (existing().parentUid == request.auth.uid || isAdmin());
+        allow create: if isSignedIn() &&
+                         isValidId(chatId) &&
+                         isValidId(messageId) &&
+                         incoming().keys().hasAll([
+                           'parentUid', 'senderUid', 'senderName', 'senderRole', 'text', 'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'parentUid', 'senderUid', 'senderName', 'senderRole', 'text', 'createdAt'
+                         ]) &&
+                         isValidChatMessage(incoming()) &&
+                         incoming().senderUid == request.auth.uid &&
+                         (
+                           (incoming().parentUid == request.auth.uid && incoming().senderRole == 'parent') ||
+                           (isAdmin() && incoming().senderRole == 'admin')
+                         ) &&
+                         exists(/databases/$(database)/documents/chats/$(chatId));
+        allow update, delete: if false;
+      }
+    }
+
+    match /notifications/{notificationId} {
+      allow get: if isSignedIn() && isValidId(notificationId) && (existing().parentUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().parentUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+                       isValidId(notificationId) &&
+                       incoming().keys().hasAll([
+                         'parentUid', 'studentId', 'title', 'body', 'category', 'read',
+                         'scheduledForLabel', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'parentUid', 'studentId', 'title', 'body', 'category', 'read',
+                         'scheduledForLabel', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidNotification(incoming()) &&
+                       (incoming().parentUid == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() &&
+                       isValidId(notificationId) &&
+                       isValidNotification(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         isAdmin() ||
+                         (
+                           existing().parentUid == 'pending_link' &&
+                           isValidId(existing().studentId) &&
+                           get(/databases/$(database)/documents/students/$(existing().studentId)).data.parentUid == request.auth.uid &&
+                           incoming().parentUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['parentUid', 'updatedAt'])
+                         ) ||
+                         (
+                           existing().parentUid == request.auth.uid &&
+                           incoming().parentUid == existing().parentUid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['read', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isSignedIn() && isValidId(notificationId) && (existing().parentUid == request.auth.uid || isAdmin());
+    }
+
+    match /case_files/{fileId} {
+      allow get: if isSignedIn() && isValidId(fileId) && (existing().parentUid == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (existing().parentUid == request.auth.uid || isAdmin());
+      allow create: if isAdmin() &&
+                       isValidId(fileId) &&
+                       incoming().keys().hasAll([
+                         'studentId', 'parentUid', 'childName', 'title', 'category', 'notes',
+                         'fileName', 'mimeType', 'fileSizeBytes', 'contentBase64', 'externalUrl',
+                         'uploadedByName', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'studentId', 'parentUid', 'childName', 'title', 'category', 'notes',
+                         'fileName', 'mimeType', 'fileSizeBytes', 'contentBase64', 'externalUrl',
+                         'uploadedByName', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidCaseFile(incoming()) &&
+                       exists(/databases/$(database)/documents/students/$(incoming().studentId));
+      allow update: if isSignedIn() &&
+                       isValidId(fileId) &&
+                       isValidCaseFile(incoming()) &&
+                       incoming().studentId == existing().studentId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         isAdmin() ||
+                         (
+                           existing().parentUid == 'pending_link' &&
+                           get(/databases/$(database)/documents/students/$(existing().studentId)).data.parentUid == request.auth.uid &&
+                           incoming().parentUid == request.auth.uid &&
+                           incoming().diff(existing()).affectedKeys().hasOnly(['parentUid', 'updatedAt'])
+                         )
+                       );
+      allow delete: if isAdmin() && isValidId(fileId);
+    }
+
+    match /center_config/{configId} {
+      allow get, list: if isSignedIn() && isValidId(configId);
+      allow create, update: if isAdmin() &&
+                               isValidId(configId) &&
+                               incoming().keys().hasAll([
+                                 'centerName', 'centerSlogan', 'centerPhone', 'centerAddress', 'centerHours',
+                                 'centerLat', 'centerLng', 'welcomeNote', 'bookButtonLabel', 'posterBannerTitle',
+                                 'showPosterBanner', 'services', 'specialists', 'packages', 'timeSlots',
+                                 'customButtons', 'updatedAt'
+                               ]) &&
+                               incoming().keys().hasOnly([
+                                 'centerName', 'centerSlogan', 'centerPhone', 'centerAddress', 'centerHours',
+                                 'centerLat', 'centerLng', 'welcomeNote', 'bookButtonLabel', 'posterBannerTitle',
+                                 'showPosterBanner', 'services', 'specialists', 'packages', 'timeSlots',
+                                 'customButtons', 'updatedAt'
+                               ]) &&
+                               isValidCenterConfig(incoming());
+      allow delete: if isAdmin() && isValidId(configId);
+    }
+  }
+}

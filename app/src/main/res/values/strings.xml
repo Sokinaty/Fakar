@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">مركز فكر</string>
+    <string name="center_full_name">مركز فكر للقياس والتقويم النفسي</string>
+    <string name="center_slogan">ابنك معانا بطل</string>
+    <string name="center_phone">01006478010</string>
+    <string name="center_director">أ / أحمد عوف</string>
+    <string name="sign_in_google">تسجيل الدخول عبر جوجل</string>
+    <string name="sign_out">تسجيل الخروج</string>
+    <string name="cd_center_logo">شعار مركز فكر للقياس والتقويم النفسي</string>
+    <string name="cd_center_poster">ملصق خدمات مركز فكر - ابنك معانا بطل</string>
+    <string name="cd_back">رجوع</string>
+</resources>

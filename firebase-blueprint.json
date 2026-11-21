@@ -1,0 +1,308 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated device/cloud user profile.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID." },
+        "displayName": { "type": "string", "description": "Display name." },
+        "email": { "type": "string", "description": "Optional cloud email." },
+        "phone": { "type": "string", "description": "Optional phone number." },
+        "role": { "type": "string", "enum": ["parent", "admin"], "description": "Access role." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp." }
+      },
+      "required": ["userId", "displayName", "email", "role", "createdAt", "updatedAt"]
+    },
+    "AccessCode": {
+      "title": "AccessCode",
+      "description": "SHA-256 credential lookup record mapping username+password to parent studentId or admin role.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string", "description": "Normalized center login username." },
+        "role": { "type": "string", "enum": ["parent", "admin"], "description": "Portal role." },
+        "studentId": { "type": "string", "description": "Linked StudentCase ID for parent accounts, empty for admin." },
+        "displayName": { "type": "string", "description": "Account display name." },
+        "linkedUid": { "type": "string", "description": "Firebase Auth UID that claimed this credential." },
+        "active": { "type": "boolean", "description": "Whether login is active." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["username", "role", "studentId", "displayName", "linkedUid", "active", "createdAt", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Authorized admin UID verified via admin access credential hash.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "credentialHash": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "credentialHash", "createdAt"]
+    },
+    "StudentCase": {
+      "title": "StudentCase",
+      "description": "Child case file enrolled in Fekr Center with auto-generated center login credentials.",
+      "type": "object",
+      "properties": {
+        "parentUid": { "type": "string", "description": "Parent Firebase Auth UID or pending_link." },
+        "parentName": { "type": "string", "description": "Parent full name." },
+        "parentPhone": { "type": "string", "description": "Parent phone number." },
+        "childName": { "type": "string", "description": "Child name." },
+        "ageYears": { "type": "integer", "description": "Child age in years." },
+        "primaryService": { "type": "string", "description": "Primary center program." },
+        "specialistName": { "type": "string", "description": "Assigned specialist name." },
+        "caseStatus": { "type": "string", "enum": ["active", "assessment", "completed", "paused"] },
+        "progressPercent": { "type": "integer", "description": "Overall progress 0-100." },
+        "totalSessions": { "type": "integer", "description": "Total scheduled sessions." },
+        "attendedSessions": { "type": "integer", "description": "Sessions attended." },
+        "clinicalNotes": { "type": "string", "description": "Specialist periodic case notes." },
+        "currentGoals": { "type": "string", "description": "Current therapy goals." },
+        "clientUsername": { "type": "string", "description": "Generated username for parent portal login." },
+        "clientPassword": { "type": "string", "description": "Generated password for parent portal login." },
+        "credentialHash": { "type": "string", "description": "SHA-256 hash of username:password." },
+        "pendingSyncRefs": { "type": "array", "description": "Bounded document paths created before parent first login." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "parentUid", "parentName", "parentPhone", "childName", "ageYears",
+        "primaryService", "specialistName", "caseStatus", "progressPercent",
+        "totalSessions", "attendedSessions", "clinicalNotes", "currentGoals",
+        "clientUsername", "clientPassword", "credentialHash", "pendingSyncRefs",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Scheduled speech or psychological therapy session.",
+      "type": "object",
+      "properties": {
+        "parentUid": { "type": "string" },
+        "studentId": { "type": "string" },
+        "childName": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "specialistName": { "type": "string" },
+        "dateLabel": { "type": "string" },
+        "timeSlot": { "type": "string" },
+        "scheduledEpochMs": { "type": "integer" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "absent", "cancelled"] },
+        "paymentStatus": { "type": "string", "enum": ["unpaid", "paid"] },
+        "feeAmount": { "type": "integer" },
+        "notes": { "type": "string" },
+        "reminderMinutesBefore": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "parentUid", "studentId", "childName", "serviceName", "specialistName",
+        "dateLabel", "timeSlot", "scheduledEpochMs", "status", "paymentStatus",
+        "feeAmount", "notes", "reminderMinutesBefore", "createdAt", "updatedAt"
+      ]
+    },
+    "MonthlyEvaluation": {
+      "title": "MonthlyEvaluation",
+      "description": "Monthly child developmental progress evaluation report.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "parentUid": { "type": "string" },
+        "childName": { "type": "string" },
+        "monthLabel": { "type": "string" },
+        "specialistName": { "type": "string" },
+        "speechScore": { "type": "integer" },
+        "attentionScore": { "type": "integer" },
+        "behaviorScore": { "type": "integer" },
+        "cognitiveScore": { "type": "integer" },
+        "motorScore": { "type": "integer" },
+        "overallScore": { "type": "integer" },
+        "summary": { "type": "string" },
+        "homeRecommendations": { "type": "string" },
+        "parentAcknowledged": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "studentId", "parentUid", "childName", "monthLabel", "specialistName",
+        "speechScore", "attentionScore", "behaviorScore", "cognitiveScore",
+        "motorScore", "overallScore", "summary", "homeRecommendations",
+        "parentAcknowledged", "createdAt", "updatedAt"
+      ]
+    },
+    "PaymentRecord": {
+      "title": "PaymentRecord",
+      "description": "Electronic session fee payment transaction.",
+      "type": "object",
+      "properties": {
+        "parentUid": { "type": "string" },
+        "appointmentId": { "type": "string" },
+        "childName": { "type": "string" },
+        "description": { "type": "string" },
+        "amountEgp": { "type": "integer" },
+        "method": { "type": "string", "enum": ["card", "vodafone_cash", "instapay", "center_cash"] },
+        "referenceCode": { "type": "string" },
+        "status": { "type": "string", "enum": ["completed", "refunded"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "parentUid", "appointmentId", "childName", "description",
+        "amountEgp", "method", "referenceCode", "status", "createdAt", "updatedAt"
+      ]
+    },
+    "ChatThread": {
+      "title": "ChatThread",
+      "description": "Direct conversation thread between a parent and a center specialist.",
+      "type": "object",
+      "properties": {
+        "parentUid": { "type": "string" },
+        "parentName": { "type": "string" },
+        "specialistId": { "type": "string" },
+        "specialistName": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["parentUid", "parentName", "specialistId", "specialistName", "lastMessage", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Single message inside a specialist chat thread.",
+      "type": "object",
+      "properties": {
+        "parentUid": { "type": "string" },
+        "senderUid": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderRole": { "type": "string", "enum": ["parent", "admin"] },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["parentUid", "senderUid", "senderName", "senderRole", "text", "createdAt"]
+    },
+    "SmartNotification": {
+      "title": "SmartNotification",
+      "description": "Smart reminder or center notification for parents.",
+      "type": "object",
+      "properties": {
+        "parentUid": { "type": "string" },
+        "studentId": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "category": { "type": "string", "enum": ["reminder", "evaluation", "payment", "general"] },
+        "read": { "type": "boolean" },
+        "scheduledForLabel": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["parentUid", "studentId", "title", "body", "category", "read", "scheduledForLabel", "createdAt", "updatedAt"]
+    },
+    "CaseFile": {
+      "title": "CaseFile",
+      "description": "Attached clinical report, therapy plan, worksheet, or document for a student case.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "parentUid": { "type": "string" },
+        "childName": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["report", "plan", "assessment", "worksheet", "other"] },
+        "notes": { "type": "string" },
+        "fileName": { "type": "string" },
+        "mimeType": { "type": "string" },
+        "fileSizeBytes": { "type": "integer" },
+        "contentBase64": { "type": "string" },
+        "externalUrl": { "type": "string" },
+        "uploadedByName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "studentId", "parentUid", "childName", "title", "category", "notes",
+        "fileName", "mimeType", "fileSizeBytes", "contentBase64", "externalUrl",
+        "uploadedByName", "createdAt", "updatedAt"
+      ]
+    },
+    "CenterConfig": {
+      "title": "CenterConfig",
+      "description": "Dynamic center-wide configuration editable by admin: contact, address, prices/services, specialists, packages, time slots, and custom buttons.",
+      "type": "object",
+      "properties": {
+        "centerName": { "type": "string" },
+        "centerSlogan": { "type": "string" },
+        "centerPhone": { "type": "string" },
+        "centerAddress": { "type": "string" },
+        "centerHours": { "type": "string" },
+        "centerLat": { "type": "number" },
+        "centerLng": { "type": "number" },
+        "welcomeNote": { "type": "string" },
+        "bookButtonLabel": { "type": "string" },
+        "posterBannerTitle": { "type": "string" },
+        "showPosterBanner": { "type": "boolean" },
+        "services": { "type": "array" },
+        "specialists": { "type": "array" },
+        "packages": { "type": "array" },
+        "timeSlots": { "type": "array" },
+        "customButtons": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "centerName", "centerSlogan", "centerPhone", "centerAddress", "centerHours",
+        "centerLat", "centerLng", "welcomeNote", "bookButtonLabel", "posterBannerTitle",
+        "showPosterBanner", "services", "specialists", "packages", "timeSlots",
+        "customButtons", "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Authorized admin UIDs verified via credential hash."
+    },
+    "/access_codes/{codeHash}": {
+      "schema": { "$ref": "#/entities/AccessCode" },
+      "description": "Username+password SHA-256 access credential mappings."
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles keyed by Firebase Auth UID."
+    },
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/StudentCase" },
+      "description": "Student case files for parents and center admins."
+    },
+    "/case_files/{fileId}": {
+      "schema": { "$ref": "#/entities/CaseFile" },
+      "description": "Clinical reports, therapy plans, and files attached to student cases."
+    },
+    "/center_config/{configId}": {
+      "schema": { "$ref": "#/entities/CenterConfig" },
+      "description": "Admin-editable center settings, prices, services, specialists, and buttons."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Therapy session bookings and attendance tracking."
+    },
+    "/evaluations/{evaluationId}": {
+      "schema": { "$ref": "#/entities/MonthlyEvaluation" },
+      "description": "Monthly child progress reports."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/PaymentRecord" },
+      "description": "Electronic fee payment receipts."
+    },
+    "/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/ChatThread" },
+      "description": "Parent-to-specialist direct chat threads."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Real-time chat messages within a thread."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/SmartNotification" },
+      "description": "Smart reminders and notifications for parents."
+    }
+  }
+}
